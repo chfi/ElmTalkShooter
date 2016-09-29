@@ -16,6 +16,27 @@ import Time exposing (Time, second)
 type alias Entity =
     { x : Float, y : Float, vx : Float, vy : Float }
 
+type alias Rect =
+    { x : Float, y : Float, w : Float, h : Float }
+
+rectOverlap : Rect -> Rect -> Bool
+rectOverlap r1 r2 =
+    r1.x < r2.x + r2.w && r1.x + r1.w > r2.x &&
+        r1.y < r2.y + r2.h && r1.y + r1.h > r2.y
+
+
+rectOverlap' : Rect -> Rect -> Bool
+rectOverlap' r1 r2 =
+    (r1.x - r1.w/2) < (r2.x + r2.w/2) && (r1.x + r1.w/2) > (r2.x - r2.w/2) &&
+        (r1.y - r1.h/2) < (r2.y + r2.h/2) && (r1.y + r1.h/2) > (r2.y - r2.h/2)
+
+
+bulletToRect : Bullet -> Rect
+bulletToRect b = { x = b.x, y = b.y, w = 10, h = 10 }
+
+enemyToRect : Enemy -> Rect
+enemyToRect e = { x = e.x, y = e.y, w = 40, h = 40 }
+
 
 type alias Player =
     Entity
@@ -221,13 +242,29 @@ step dt model =
         p' =
             updatePlayer dt model.player
 
-        es' =
-            List.map (updateEnemy dt) model.enemies
-
         bs' =
             List.map (updateEntity dt) model.bullets
+            |> List.filterMap (killBullets model.enemies)
+
+        es' =
+            List.map (updateEnemy dt) model.enemies
+            |> List.filterMap (collideBullets model.bullets)
+
     in
         { model | player = p', enemies = es', bullets = bs' }
+
+collideBullets : List Bullet -> Enemy -> Maybe Enemy
+collideBullets bs e =
+    case List.any (\b -> collideBulletEnemy' b e) bs of
+        True -> Nothing
+        False -> Just e
+
+killBullets : List Enemy -> Bullet -> Maybe Bullet
+killBullets es b =
+    if List.any (\e -> collideBulletEnemy' b e) es || b.y > 1000
+        then Nothing
+        else Just b
+
 
 
 spawnEnemy : Enemy
@@ -287,6 +324,20 @@ updateEnemy =
 
 updateBullet : Float -> Bullet -> Bullet
 updateBullet = updateEntity
+
+
+collideBulletEnemy : Bullet -> Enemy -> Maybe Enemy
+collideBulletEnemy b e =
+    if rectOverlap' (bulletToRect b) (enemyToRect e) then Nothing else Just e
+
+collideBulletEnemy' : Bullet -> Enemy -> Bool
+collideBulletEnemy' b e =
+    rectOverlap' (bulletToRect b) (enemyToRect e)
+
+cullEnemies : List (Maybe Enemy) -> List Enemy
+cullEnemies mes = List.foldr (\e es -> case e of
+                                           Just e -> e :: es
+                                           Nothing -> es) [] mes
 
 
 -- SUBSCRIPTIONS
