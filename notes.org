@@ -1,0 +1,4 @@
+* stuff left
+player fire cooldown
+randomize enemy spawns
+resize canvas to screen (?)
